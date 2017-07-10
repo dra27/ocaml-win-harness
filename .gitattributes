@@ -1,2 +1,5 @@
 # Default behaviour, for if core.autocrlf isn't set
 * text=auto
+
+# Shell scripts
+*.sh text eol=lf
