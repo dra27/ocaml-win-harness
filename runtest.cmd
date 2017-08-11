@@ -105,10 +105,10 @@ set PORT=%1
 if "%PORT:~0,4%" neq "cygw" (
   cd config
 rem @@DRA Should switch between these two based on the root commit in trunk where this changed
-rem  copy s-nt.h ..\byterun\caml\s.h
-rem  copy m-nt.h ..\byterun\caml\m.h
-  copy s-nt.h s.h
-  copy m-nt.h m.h
+  copy s-nt.h ..\byterun\caml\s.h
+  copy m-nt.h ..\byterun\caml\m.h
+rem  copy s-nt.h s.h
+rem  copy m-nt.h m.h
   copy Makefile.%1 Makefile
   cd ..
 )
