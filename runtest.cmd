@@ -59,32 +59,38 @@ echo Worktrees will be erased!
 pause
 
 set PORTS=mingw mingw64 msvc msvc64
-if "%MODE%" neq "flexlink" set PORTS=%PORTS% cygwin cygwin64
+rem set PORTS=
+if "%MODE%" neq "flexlink" set PORTS=%PORTS% cygwin
+rem if "%MODE%" neq "flexlink" set PORTS=%PORTS% cygwin
 
+pushd .
 for %%B in (%PORTS%) do call :Prepare %%B
+set RETURN=%CD%
 cd ..
 for /f "delims=" %%P in ('C:\cygwin\bin\cygpath --absolute .') do set ROOT=%%P
 
 rem Launch the builds
-cd ocaml
+popd
 if not exist logs\%1\nul md logs\%1
 echo Started>logs\%1\start.stamp
 
+rem Set to 64 to use Cygwin64 for all 6 builds
+set CYGWIN_PORT=
 for %%P in (%PORTS%) do (
-  if "%%P" equ "mingw" snap C:\Windows\System32\cmd.exe NW /c "C:\cygwin64\bin\bash -lc '%ROOT%ocaml/run.sh %ROOT% mingw %* || pause"
-  if "%%P" equ "mingw64" snap C:\Windows\System32\cmd.exe NE /c "C:\cygwin64\bin\bash -lc '%ROOT%ocaml/run.sh %ROOT% mingw64 %* || pause"
+  if "%%P" equ "mingw" snap C:\Windows\System32\cmd.exe NW /c "C:\cygwin%CYGWIN_PORT%\bin\bash -lc '%ROOT%ocaml-win-harness/run.sh %ROOT% mingw %* || pause"
+  if "%%P" equ "mingw64" snap C:\Windows\System32\cmd.exe NE /c "C:\cygwin%CYGWIN_PORT%\bin\bash -lc '%ROOT%ocaml-win-harness/run.sh %ROOT% mingw64 %* || pause"
   if "%%P" equ "msvc" (
-    call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
+    call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
     rem call "C:\Program Files (x86)\Microsoft Visual Studio\Shared\14.0\VC\vcvarsall.bat" x86
-    snap C:\Windows\System32\cmd.exe W /c "C:\cygwin64\bin\bash -lc '%ROOT%ocaml/run.sh %ROOT% msvc %* msvs-promote-path || pause"
+    snap C:\Windows\System32\cmd.exe W /c "C:\cygwin%CYGWIN_PORT%\bin\bash -lc '%ROOT%ocaml-win-harness/run.sh %ROOT% msvc %* msvs-promote-path || pause"
   )
   if "%%P" equ "msvc64" (
-    call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+    call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
     rem call "C:\Program Files (x86)\Microsoft Visual Studio\Shared\14.0\VC\vcvarsall.bat" amd64
-    snap C:\Windows\System32\cmd.exe E /c "C:\cygwin64\bin\bash -lc '%ROOT%ocaml/run.sh %ROOT% msvc64 %* msvs-promote-path || pause"
+    snap C:\Windows\System32\cmd.exe E /c "C:\cygwin%CYGWIN_PORT%\bin\bash -lc '%ROOT%ocaml-win-harness/run.sh %ROOT% msvc64 %* msvs-promote-path || pause"
   )
-  if "%%P" equ "cygwin" snap C:\Windows\System32\cmd.exe SW /c "C:\cygwin\bin\bash -lc '%ROOT%ocaml/run.sh %ROOT% cygwin %* || pause"
-  if "%%P" equ "cygwin64" snap C:\Windows\System32\cmd.exe SE /c "C:\cygwin64\bin\bash -lc '%ROOT%ocaml/run.sh %ROOT% cygwin64 %* || pause"
+  if "%%P" equ "cygwin" snap C:\Windows\System32\cmd.exe SW /c "C:\cygwin\bin\bash -lc '%ROOT%ocaml-win-harness/run.sh %ROOT% cygwin %* || pause"
+  if "%%P" equ "cygwin64" snap C:\Windows\System32\cmd.exe SE /c "C:\cygwin64\bin\bash -lc '%ROOT%ocaml-win-harness/run.sh %ROOT% cygwin64 %* || pause"
 )
 goto :EOF
 
@@ -92,21 +98,28 @@ goto :EOF
 cd ..\ocaml-%1
 git clean -dfx
 git reset .
+git checkout -f -B harness-%1 %HEAD%
+for /f "delims=" %%F in ('dir /ad/b') do if "%%F" neq "flexdll" rd /s/q "%%F"
+for /f "delims=" %%F in ('dir /a-d/b') do if "%%F" neq ".git" del "%%F"
 git checkout .
 if exist flexdll\.git (
   cd flexdll
+  git fetch origin
   git clean -dfx
+  if "%MODE%" equ "flexlink" git submodule update --init
+rem  git checkout 0.36
+rem  git checkout fix-RELOC_REL32
   cd ..
+  git submodule update
 )
-if "%MODE%" equ "flexlink" git submodule update --init
-git checkout harness-%1
-git reset --hard %HEAD%
 set PORT=%1
 if "%PORT:~0,4%" neq "cygw" (
   cd config
 rem @@DRA Should switch between these two based on the root commit in trunk where this changed
-  copy s-nt.h ..\byterun\caml\s.h
-  copy m-nt.h ..\byterun\caml\m.h
+  copy s-nt.h ..\runtime\caml\s.h
+  copy m-nt.h ..\runtime\caml\m.h
+rem  copy s-nt.h ..\byterun\caml\s.h
+rem  copy m-nt.h ..\byterun\caml\m.h
 rem  copy s-nt.h s.h
 rem  copy m-nt.h m.h
   copy Makefile.%1 Makefile
