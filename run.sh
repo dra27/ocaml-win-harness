@@ -41,10 +41,13 @@ FLAMBDA=0
 SAFE_STRING=0
 SPACETIME=0
 NO_ERRORS=0
+NOFLAT=0
+WINDOWS_UNICODE=1
 
 CYG_FLAMBDA=
 CYG_SPACETIME=
 CYG_SAFE_STRING=
+CYG_NOFLAT=
 
 PHASES=flexdll.opt
 MODE=standard
@@ -53,6 +56,10 @@ while [[ -n $1 ]] ; do
   case "$1" in
     msvs-promote-path)
       eval $(tools/msvs-promote-path)
+      ;;
+    noflat)
+      NOFLAT=1
+      CYG_NOFLAT=-no-flat-float-array
       ;;
     flambda)
       FLAMBDA=1
@@ -65,6 +72,9 @@ while [[ -n $1 ]] ; do
     spacetime)
       SPACETIME=1
       CYG_SPACETIME=-spacetime
+      ;;
+    windows-ansi)
+      WINDOWS_UNICODE=0
       ;;
     no-errors)
       NO_ERRORS=1
@@ -155,20 +165,27 @@ for phase in $PHASES ; do
     if [[ $MODE = "standard" ]] ; then
       PRE_WORLD=flexdll
     fi
-    MAKE_INVOKE="make -f Makefile.nt"
+    MAKE_INVOKE="make"
     if ((!NO_ERRORS)) ; then
       if [[ $PORT = "mingw" ]] ; then
         WARNERROR=-Werror
       elif [[ $PORT = "msvc" ]] ; then
         WARNERROR=-WX
       fi
-      sed -i -e "/\(BYTE\|NATIVE\)CCCOMPOPTS=./s/\r\?$/ $WARNERROR\0/" config/Makefile
+      sed -i -e "/^ *CFLAGS *=/s/\r\?$/ $WARNERROR\0/" config/Makefile
+    fi
+    if ((NOFLAT)) ; then
+      sed -i -e "s/FLAT_FLOAT_ARRAY=true/FLAT_FLOAT_ARRAY=false/" config/Makefile
+      sed -i -e "/FLAT_FLOAT_ARRAY/d" byterun/caml/m.h
     fi
     if ((FLAMBDA)) ; then
       sed -i -e "s/FLAMBDA=false/FLAMBDA=true/" config/Makefile
     fi
     if ((SAFE_STRING)) ; then
-      sed -i -e "s/SAFE_STRING=false/SAFE_STRING=true/" config/Makefile
+      sed -i -e "s/SAFE_STRING=[a-z]*/SAFE_STRING=true/" config/Makefile
+    fi
+    if ((!WINDOWS_UNICODE)) ; then
+      sed -i -e "s/WINDOWS_UNICODE=1/WINDOWS_UNICODE=0/" config/Makefile
     fi
     if ((SPACETIME)) ; then
       sed -i -e "s/WITH_SPACETIME=false/WITH_SPACETIME=true/" config/Makefile
@@ -180,7 +197,7 @@ for phase in $PHASES ; do
   fi
 
   if [[ $PORT = "cygwin" ]] ; then
-    if ! script --return --append -c "./configure $CYG_FLAMBDA $CYG_SAFE_STRING $CYG_SPACETIME" $ROOT/ocaml/logs/$TAG/build-$BUILD.log ; then
+    if ! script --return --append -c "./configure $CYG_NOFLAT $CYG_FLAMBDA $CYG_SAFE_STRING $CYG_SPACETIME" $ROOT/ocaml/logs/$TAG/build-$BUILD.log ; then
       exit 1
     fi
     sed -i -e "s/MAX_TESTSUITE_DIR_RETRIES=0/MAX_TESTSUITE_DIR_RETRIES=1/" config/Makefile
